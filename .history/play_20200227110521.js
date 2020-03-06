@@ -1,0 +1,16 @@
+let name = "max";
+let age = 29;
+let hasHobbies = true;
+
+function summarizeuser(userName, userAge, userHasHobby) {
+  return (
+    "Name is " +
+    userName +
+    ", age is " +
+    userAge +
+    ", and the user has Hobbies : " +
+    userHasHobby
+  );
+}
+
+console.log(summarizeuser(name, age, hasHobbies));
