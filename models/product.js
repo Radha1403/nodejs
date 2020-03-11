@@ -5,21 +5,29 @@ const p = path.join(
   "data",
   "products.json"
 );
-const getProductFromFile = cb => {
+const getProductsFromFile = cb => {
   fs.readFile(p, (err, fileContent) => {
+    console.log("file content:" + fileContent);
     if (err) {
       cb([]);
-    } else if (fileContent != undefined) cb(JSON.parse(fileContent));
+    } else if (fileContent.length > 0) {
+      cb(JSON.parse(fileContent));
+    } else {
+      cb([]);
+    }
   });
 };
 
 module.exports = class Product {
-  constructor(t) {
-    this.title = t;
+  constructor(title, imageUrl, description, price) {
+    this.title = title;
+    this.imageUrl = imageUrl;
+    this.description = description;
+    this.price = price;
   }
 
   save() {
-    getProductFromFile(products => {
+    getProductsFromFile(products => {
       products.push(this);
       fs.writeFile(p, JSON.stringify(products), err => {
         console.log(err);
@@ -28,6 +36,6 @@ module.exports = class Product {
   }
 
   static fetchAll(cb) {
-    getProductFromFile(cb);
+    getProductsFromFile(cb);
   }
 };
