@@ -14,7 +14,12 @@ main {
   padding: 1rem;
   margin: auto;
 }
-
+.image {
+  height: 20rem;
+}
+.image img {
+  height: 20rem;
+}
 form {
   display: inline;
 }
