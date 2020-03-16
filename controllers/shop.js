@@ -1,5 +1,6 @@
 const Product = require("../models/product");
 const Cart = require("../models/cart");
+const CartItem = require("../models/cart-item");
 exports.getProducts = (req, res, next) => {
   Product.findAll()
     .then(products => {
@@ -38,25 +39,15 @@ exports.getIndex = (req, res, next) => {
 };
 
 exports.getCart = (req, res, next) => {
-  Cart.getProducts(cart => {
-    Product.findAll()
+  req.user.getCart().then(cart => {
+    cart
+      .getProducts()
       .then(products => {
-        const cartProducts = [];
-        for (product of products) {
-          const cartProductData = cart.products.find(
-            prod => prod.id === product.id
-          );
-          if (cartProductData) {
-            cartProducts.push({
-              productData: product,
-              qty: cartProductData.qty
-            });
-          }
-        }
+        console.log(products);
         res.render("shop/cart", {
           docTitle: "Your Cart",
           path: req.path,
-          products: cartProducts
+          products: products
         });
       })
       .catch(err => console.log(err));
@@ -65,28 +56,100 @@ exports.getCart = (req, res, next) => {
 
 exports.postCart = (req, res, next) => {
   const prodtId = req.body.productId;
-  const prodPrice = req.body.price;
-  Cart.addProduct(prodtId, prodPrice);
-  res.redirect("/cart");
-};
+  let fetchedCart;
+  let newQuantity = 1;
+  req.user
+    .getCart()
+    .then(cart => {
+      if (cart) return cart;
+      else {
+        return req.user.createCart();
+      }
+    })
+    .then(cart => {
+      fetchedCart = cart;
+      return cart.getProducts({ where: { id: prodtId } });
+    })
+    .then(products => {
+      let product;
+      if (products.length > 0) product = products[0];
 
-exports.getOrders = (req, res, next) => {
-  res.render("shop/Orders", {
-    docTitle: "Orders",
-    path: req.path
-  });
-};
-
-exports.getCheckout = (req, res, next) => {
-  res.render("shop/checkout", {
-    docTitle: "Checkout",
-    path: req.path
-  });
+      if (product) {
+        const oldQuantity = product.cartItem.quantity;
+        newQuantity = oldQuantity + 1;
+        return product;
+      }
+      return Product.findByPk(prodtId);
+    })
+    .then(data => {
+      return fetchedCart.addProduct(data, {
+        through: { quantity: newQuantity }
+      });
+    })
+    .then(() => {
+      res.redirect("/cart");
+    })
+    .catch(err => console.log(err));
 };
 
 exports.postDeleteProduct = (req, res, next) => {
-  const id = req.body.productId;
-  const productPrice = req.body.productPrice;
-  Cart.deleteProduct(id, productPrice);
-  res.redirect("/cart");
+  const productId = req.body.productId;
+  req.user
+    .getCart()
+    .then(cart => {
+      return cart.getProducts({ where: { id: productId } });
+    })
+    .then(products => {
+      const product = products[0];
+      return product.cartItem.destroy();
+    })
+    .then(() => {
+      res.redirect("/cart");
+    })
+    .catch(err => console.log(err));
+};
+
+exports.postOrder = (req, res, next) => {
+  let fetchedCart;
+  req.user
+    .getCart()
+    .then(cart => {
+      if (cart) return cart;
+      else return req.user.createCart();
+    })
+    .then(cart => {
+      fetchedCart = cart;
+      return cart.getProducts();
+    })
+    .then(products => {
+      return req.user
+        .createOrder()
+        .then(order => {
+          return order.addProducts(
+            products.map(product => {
+              product.orderItem = { quantity: product.cartItem.quantity };
+              return product;
+            })
+          );
+        })
+        .then(() => {
+          fetchedCart.setProducts(null);
+        })
+        .then(() => {
+          res.redirect("/orders");
+        });
+    });
+};
+
+exports.getOrders = (req, res, next) => {
+  req.user
+    .getOrders({ include: ["products"] })
+    .then(orders => {
+      res.render("shop/Orders", {
+        docTitle: "Orders",
+        path: req.path,
+        orders: orders
+      });
+    })
+    .catch(err => console.log(err));
 };
